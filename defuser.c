@@ -161,12 +161,40 @@ int solve_phase_6(uint64_t challenge, char *out, size_t cap) {
     return write_answer(out, cap, values, count);
 }
 
+/* secret_mix（0x402610）：rol32(v,7) -> +0x5a1f -> ^0xa916 */
+static uint32_t secret_mix(uint32_t v) {
+    uint32_t rotated = (v << 7) | (v >> 25);
+    return (rotated + UINT32_C(0x5a1f)) ^ UINT32_C(0xa916);
+}
+
+/*
+ * Honor：secret_gate 要求整行长度落在 [36,163]；偏移 32..35 必须是 "OPEN"
+ * （检查的是 [rbp-0xb0]，即缓冲区基址 rbp-0xd0 之后 0x20 字节），
+ * 然后从偏移 36 起交给 secret_phase，用 sscanf("%u %u %u") 读出三个 u32。
+ * secret_phase 以 challenge 为 rsi、context 为 rdx：
+ *   第 1 个数 = context & 3
+ *   第 2 个数 = mix((lo^hi)^(tlo^thi)) ^ ((context&3)*0x5a1f) ^ ((context>>16) 的低 32 位)
+ *   第 3 个数 = 第 2 个数 ^ (((lo^hi)>>7) + (tlo^thi) + (context&3) + 0xa916)
+ * 其中 lo/hi 是 challenge 的低/高 32 位，tlo/thi 是 context 的低/高 32 位。
+ */
 int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
-    (void)challenge;
-    (void)context;
-    (void)out;
-    (void)cap;
-    // TODO（选做）: 根据 secret_gate、secret_copy 和 secret_phase 的汇编构造完整的第七行，写入 out 后返回 0。
-    // 第七行不一定只有整数，可以直接用 snprintf 写入；还没完成时保持返回 1，测试会显示 not attempted。
-    return 1;
+    uint32_t lo = (uint32_t)challenge;
+    uint32_t hi = (uint32_t)(challenge >> 32);
+    uint32_t tlo = (uint32_t)context;
+    uint32_t thi = (uint32_t)(context >> 32);
+
+    uint32_t folded = (lo ^ hi) ^ (tlo ^ thi);
+    uint32_t phase = (uint32_t)context & 3;
+    uint32_t quiet = (uint32_t)(context >> 16);
+
+    uint32_t first = phase;
+    uint32_t second = secret_mix(folded) ^ (phase * UINT32_C(0x5a1f)) ^ quiet;
+    uint32_t third = second ^ (((lo ^ hi) >> 7) + (tlo ^ thi) + phase + UINT32_C(0xa916));
+
+    /* 前 32 字节随便填（这里用空格），第 32..35 字节是 "OPEN"，数字从第 36 字节开始 */
+    static const char prefix[] = "                                OPEN";
+
+    int size = snprintf(out, cap, "%s %" PRIu32 " %" PRIu32 " %" PRIu32,
+                        prefix, first, second, third);
+    return (size < 0 || (size_t)size >= cap) ? 1 : 0;
 }

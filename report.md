@@ -13,7 +13,7 @@
   5. `make` 后跑 `python3 public_test.py --phase N`。
 - 关键前提：每关的 `challenge` 由 `(seed, phase)` 独立生成，**同一 seed 下第 1 关和第 2 关的 challenge 不同**，所以公式必须对任意 `challenge` 成立，不能记录某次运行的具体答案。
 
-最终结果：`Public tests: 60/60`（六关各 10/10）。
+最终结果：`Public tests: 60/60`（六关各 10/10），`Secret public tests: 10/10`。
 
 ## 二、Phase 1：函数调用与返回值
 
@@ -311,7 +311,7 @@ seed `20261030`，challenge `0x8156aef15aa39d4b`，输入 `1429514766` → `Phas
 
 ## 八、运行结果
 
-- 公开测试：`Public tests: 60/60`（六关各 10/10）。
+- 公开测试：`Public tests: 60/60`（六关各 10/10），Honor 的 `Secret public tests: 10/10`。
 - 非公开 seed `20261030` 的全流程输出：
 
 ```
@@ -328,6 +328,7 @@ Phase 5 defused.
 Phase 6 challenge: 0x8156aef15aa39d4b
 Phase 6 defused.
 Congratulations! You've defused the bomb.
+Secret phase defused.
 ```
 
 ![公开测试 60/60](images/public-tests.png)
@@ -338,7 +339,99 @@ Congratulations! You've defused the bomb.
 
 ## 九、Honor（secret）部分
 
-当前状态：**尚未完成**。`solve_secret` 仍是模板状态，公开测试中 `Secret public tests: 0/10`（`solver_error`）。计划通过 `secret_gate`、`secret_copy`、`secret_phase` 分析入口触发条件与 `context` 的来源，再补入实现；若截止前未能完成，此处如实标注为未完成。
+### 9.1 入口：第七行从哪来，`context` 是什么
+
+`main` 在六关全部通过后做四件事：
+
+```
+4015b7: lea    rcx,[rbp-0x630]          ; 第 2 关答句缓冲区
+4015de: punpcklqdq xmm0,xmm1            ; 把 6 个答句缓冲区地址拼成 char*[6]
+40162f: call   transcript_context       ; context = 六行答句的数字摘要
+401634: mov    esi,0x7
+401643: call   phase_challenge          ; challenge = challenge_from_seed(seed, 7)
+401648: mov    rdx,rbx                  ; 第 3 参数 = context
+401652: mov    rsi,rax                  ; 第 2 参数 = challenge
+401655: call   secret_gate              ; secret_gate(第七行, challenge, context)
+40165d: test   al,al
+40165f: je     explode_bomb             ; 返回 0 就 BOOM
+```
+
+由此确定：`solve_secret(challenge, context, ...)` 的 `context` 就是驱动里 `transcript_context(前六行)` 的值（每行按十进制数字切分、逐个 `context_mix` 折叠），`challenge` 是 phase 7 的 challenge。两者都要参与运算，任何一个都不能当常量。
+
+### 9.2 secret_gate：格式门槛（关键汇编）
+
+```
+40272b: lea    r12,[rbp-0xd0]           ; 缓冲区起点
+402740: rep stos QWORD PTR [rdi],rax    ; 20 个 qword + 1 个 dword 清零（164 字节）
+40274c: call   strlen@plt
+402751: sub    rax,0x24                 ; len - 36
+402755: cmp    rax,0x7f
+402759: jbe    402770                   ; 无符号比较：只接受 36 ≤ len ≤ 163
+402776: call   secret_copy              ; 逐字节拷贝整行（含结尾 NUL）
+40277b: cmp    DWORD PTR [rbp-0xb0],0x4e45504f   ; 缓冲区 + 0x20 处 == "OPEN"
+402785: jne    40275b                   ; 否则返回 0
+402794: call   secret_phase              ; 参数是 缓冲区 + 0x24
+```
+
+`0x4e45504f` 按小端就是 `"OPEN"`，但比较的地址是 `[rbp-0xb0]`、缓冲区基址是 `[rbp-0xd0]`，两者相差 `0x20`，也就是说 **`"OPEN"` 必须在整行的第 32~35 字节**，不是行首；`secret_phase` 的字符串参数又是 `[rbp-0xac]`，即第 36 字节。我第一次按"行首 OPEN"拼行，`bomb` 走到 `Congratulations!` 之后仍然 BOOM；把 `"OPEN"` 挪到偏移 32 后立刻通过。这是本题最容易踩的坑——三个偏移 0x20 / 0x24 / 0xd0 必须一起看。
+
+### 9.3 secret_phase：三个 u32 的关系（关键汇编）
+
+```
+40264f: call valid_u32_fields(str,3)    ; 恰好 3 个十进制 u32（超出 32 位或有多余字符都拒绝）
+402686: call __isoc99_sscanf(str,"%u %u %u", &a,&b,&c)
+402690: mov ecx,r13d ; and ecx,0x3      ; r13 = context
+402698: cmp [rbp-0x2c],ecx              ; a == context & 3
+4026b2: xor esi,r12d                    ; A = (challenge>>32) ^ (challenge & 0xffffffff)
+4026b5: xor r8d,r13d                    ; B = (context>>32)  ^ (context  & 0xffffffff)
+4026b8: shr r13,0x10                    ; context >> 16
+4026be: xor r9d,r13d                    ; C = (context&3)*0x5a1f ^ (context>>16 的低 32 位)
+4026c1: xor edi,r8d ; call secret_mix   ; mix32(A ^ B)
+4026c9: xor eax,r9d ; cmp [rbp-0x28],eax ; b == mix32(A^B) ^ C
+4026d1: shr esi,0x7                     ; A >> 7
+4026d4: lea edx,[r8+rcx*1+0xa916]       ; B + (context&3) + 0xa916
+4026dc: add edx,esi
+4026de: xor eax,edx ; cmp [rbp-0x24],eax ; c == b ^ edx
+4026e3: sete dl                         ; 三个比较全过才返回 1
+
+secret_mix: rol eax,0x7 ; add eax,0x5a1f ; xor eax,0xa916
+```
+
+恢复出的关系（全部是 32 位运算，加法与移位都按 $2^{32}$ 回绕）：
+
+```
+A = (challenge >> 32) ^ (challenge & 0xffffffff)
+B = (context   >> 32) ^ (context   & 0xffffffff)
+mix32(v) = (rol32(v, 7) + 0x5a1f) ^ 0xa916
+
+a = context & 3
+b = mix32(A ^ B) ^ ( (context & 3) * 0x5a1f ^ (context >> 16 的低 32 位) )
+c = b ^ ( (A >> 7) + B + (context & 3) + 0xa916 )
+```
+
+几个细节：
+
+- `r12` 是 challenge、`r13` 是 context，来自调用点 `mov rsi,rax` / `mov rdx,rbx` 的顺序，不能想当然交换。
+- `xor r8d,r13d` 只改 `r8` 的低 32 位，但 `r8` 原本就是 `context >> 32`（高位为零），所以后面 `lea edx,[r8+rcx*1+0xa916]` 取到的仍是 `B`，而不是 `(context>>32)` 原值——这里我一开始把 `lea` 的基址当成 `context>>32`，算出的 `c` 偏了，用非公开 seed 交叉验证时才发现。
+- `rol` 是 32 位循环移位，必须写成 `(v << 7) | (v >> 25)`，不能用普通左移。
+
+### 9.4 输出行的构造
+
+`solve_secret` 输出一行：前 32 字节填充（这里用空格）+ `"OPEN"` + 空格 + 三个十进制 u32。行长 36 + 数字部分，落在 `[36, 163]` 内，`valid_u32_fields` 与 `sscanf` 都能通过。
+
+### 9.5 验证记录（非公开 seed 之外）
+
+| seed | 结果 |
+| --- | --- |
+| 777 | `Secret phase defused.` |
+| 123456789 | `Secret phase defused.` |
+| 20261030 | `Secret phase defused.` |
+| 4294967296 | `Secret phase defused.` |
+| 31415926535 | `Secret phase defused.` |
+
+其中 `4294967296`（即 $2^{32}$）专门用来验证高低 32 位拆分：低 32 位为 0、高 32 位为 1，如果公式把 `challenge`/`context` 的整体当成 32 位就会在这里露馅。
+
+`python3 public_test.py --secret` 的结果为 `Secret public tests: 10/10`；全量 `python3 public_test.py` 为 `Public tests: 60/60`、`Secret public tests: 10/10`。
 
 ## 十、参考与工具
 
