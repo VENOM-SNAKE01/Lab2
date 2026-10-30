@@ -64,6 +64,8 @@ ans = (t2 + 0xb86) ^ s0
 
 seed `20261030`，challenge `0x30348194e1f8df4d`，输入 `985045630` → `Phase 1 defused.`
 
+![phase1 的运行结果](images/phase1.png)
+
 ## 三、Phase 2：数组、循环与递推
 
 ### 关键汇编
@@ -117,6 +119,8 @@ v[i] = 3 * (v[i-1] + i) - ((challenge >> (27 + 5*(i-1))) & 0x1f)     i = 1..5
 
 seed `20261030`，challenge `0x0499d9767b99a822`，输入
 `534 1590 4754 14260 42770 128306` → `Phase 2 defused.`
+
+![phase2 的运行结果](images/phase2.png)
 
 ## 四、Phase 3：switch 与跳转表
 
@@ -176,6 +180,8 @@ p3_dispatch:
 
 seed `20261030`，challenge `0x60db877a835f9c30`，输入 `0 1021063698` → `Phase 3 defused.`
 
+![phase3 的运行结果](images/phase3.png)
+
 ## 五、Phase 4：递归
 
 ### 关键汇编
@@ -215,6 +221,8 @@ walk(a, lo, hi, d):
 ### 验证记录（非公开 seed）
 
 seed `20261030`，challenge `0xd1e0cdee6a36cdda`，输入 `1916705825` → `Phase 4 defused.`
+
+![phase4 的运行结果](images/phase4.png)
 
 ## 六、Phase 5：结构体、指针与链表
 
@@ -273,6 +281,8 @@ start  = ch & 7 ,  steps = (ch >> 3) & 3
 
 seed `20261030`，challenge `0xa295dc5687270f3a`，输入 `2743599389 849` → `Phase 5 defused.`
 
+![phase5 的运行结果](images/phase5.png)
+
 ## 七、Phase 6：函数指针表与间接调用
 
 ### 关键汇编
@@ -325,10 +335,12 @@ ans = T[(ch >> 3) & 7](y) + 0xfd35
 seed `20261030`，challenge `0x8156aef15aa39d4b`，输入 `1429514766` → `Phase 6 defused.`
 整轮输出以 `Congratulations! You've defused the bomb.` 结束。
 
+![phase6 的运行结果](images/phase6.png)
+
 ## 八、运行结果
 
-- 公开测试：`Public tests: 60/60`（六关各 10/10），Honor 的 `Secret public tests: 10/10`。
-- 非公开 seed `20261030` 的全流程输出：
+- 全量公开测试：`Public tests: 60/60`（六关各 10/10）；Honor：`Secret public tests: 10/10`。
+- 非公开 seed `20261030` 的全流程输出（管道模式，共 20 行）：
 
 ```
 Phase 1 challenge: 0x30348194e1f8df4d
@@ -347,11 +359,9 @@ Congratulations! You've defused the bomb.
 Secret phase defused.
 ```
 
-![公开测试 60/60](images/public-tests.png)
+![全量公开测试（60/60，含 Secret 10/10）](images/public-tests.png)
 
-![非公开 seed 20261030 运行结果](images/seed-20261030.png)
-
-截图文件放在仓库的 `images/` 目录下，命名与上面两行一致，随代码一起提交。
+各关各自的运行截图放在第二~七节末尾（`images/phase1.png` ~ `images/phase6.png`）；Honor 与非公开 seed 的截图见 9.5。
 
 ## 九、Honor（secret）部分
 
@@ -449,6 +459,22 @@ c = b ^ ( (A >> 7) + B + (context & 3) + 0xa916 )
 
 `python3 public_test.py --secret` 的结果为 `Secret public tests: 10/10`；全量 `python3 public_test.py` 为 `Public tests: 60/60`、`Secret public tests: 10/10`。
 
+![Honor：`python3 public_test.py --secret`](images/secret.png)
+
+非公开 seed `20261030` 的全流程：
+
+```bash
+{ ./defuser --seed 20261030; ./defuser --secret --seed 20261030; } | ./bomb --seed 20261030
+```
+
+![seed 20261030 第一屏](images/seed-20261030-1.png)
+
+![seed 20261030 第二屏](images/seed-20261030-2.png)
+
+![seed 20261030 第三屏（含 Secret phase defused.）](images/seed-20261030-3.png)
+
+`bomb` 在交互式终端下（stdout 是 TTY）会额外打印剧情文本和 `[1 当前] [2 待解除] …` 的进度条，重定向到管道时这段会被静默——同一条命令用 `wc -l` 统计只有 20 行。所以上面三张截图中的剧情文字是炸弹的正常输出，不是截图杂讯。
+
 ### 9.6 随机 seed 抽查
 
 公开列表只有 10 个 seed，为了确认公式对任意 `(challenge, context)` 都成立（而不是记下了某几次的答案），又用 `random.getrandbits(64)` 现场生成 20 个 64 位 seed，直接调用 `public_test.py` 里的 `check_seed`（流程：`defuser --seed S` 出六行 → 喂 `bomb` 校验 → `defuser --secret --seed S` → 六行加 secret 行再喂 `bomb` → 要求输出里出现 `Secret phase defused.`）。结果 **20/20 PASS**，其中几条：
@@ -462,6 +488,30 @@ c = b ^ ( (A >> 7) + B + (context & 3) + 0xa916 )
 | 17068187748191050918 | PASS |
 
 因为 `context` 是由喂给 `bomb` 的那六行文本折叠出来的，这 20 次 PASS 同时说明六关的答句与 secret 行是一条完整、彼此自洽的链路，任何一环写死都会在这里断掉。
+
+可复现命令（在仓库根目录执行）：
+
+```bash
+python3 - <<'EOF'
+import importlib.util, random, sys
+from pathlib import Path
+sys.path.insert(0, ".")
+spec = importlib.util.spec_from_file_location("pt", "public_test.py")
+pt = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(pt)
+root = Path(".").resolve()
+random.seed(20261030)
+seeds = [random.getrandbits(64) for _ in range(20)]
+bad = 0
+for s in seeds:
+    err = pt.check_seed(root, s)
+    print(f"{s}: {'PASS' if err is None else 'FAIL ' + str(err)}")
+    bad += err is not None
+print(f"random seeds passed: {len(seeds) - bad}/{len(seeds)}")
+EOF
+```
+
+![随机 20 个 seed 抽查](images/seed-random20.png)
 
 ## 十、参考与工具
 
