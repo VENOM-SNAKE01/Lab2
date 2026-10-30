@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="474" viewBox="0 0 780 474" font-family="DejaVu Sans, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#475569"/></marker></defs>
+<rect width="780" height="474" fill="#ffffff"/>
+<text x="18" y="24" font-size="15" font-weight="bold" fill="#0f172a">Phase 1 数据流：challenge → 三个中间量 → 口令</text>
+<rect x="18" y="46" width="470" height="56" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.4"/>
+<text x="32" y="69" font-size="13.5" font-weight="bold" fill="#1e293b">challenge</text>
+<text x="32" y="89" font-size="12" fill="#475569">64 位，来自 splitmix64(seed, 1)</text>
+<line x1="253" y1="102" x2="253" y2="126" stroke="#475569" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="128" width="470" height="56" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.4"/>
+<text x="32" y="151" font-size="13.5" font-weight="bold" fill="#1e293b">lo / hi / mid</text>
+<text x="32" y="171" font-size="12" fill="#475569">lo = ch &amp; 0xffffffff  hi = ch&gt;&gt;32  mid = (ch&gt;&gt;16) 截 32 位</text>
+<line x1="253" y1="184" x2="253" y2="208" stroke="#475569" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="210" width="470" height="56" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.4"/>
+<text x="32" y="233" font-size="13.5" font-weight="bold" fill="#1e293b">t2 = (5·hi + lo) ^ 0x3902</text>
+<text x="32" y="253" font-size="12" fill="#475569">5·hi 与 +lo 均按 2^32 回绕</text>
+<line x1="253" y1="266" x2="253" y2="290" stroke="#475569" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="292" width="470" height="56" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.4"/>
+<text x="32" y="315" font-size="13.5" font-weight="bold" fill="#1e293b">s0 = (5·lo) ^ (mid + 0xcd4e)</text>
+<text x="32" y="335" font-size="12" fill="#475569">step0 借用上一调用残留的 %ecx</text>
+<line x1="253" y1="348" x2="253" y2="372" stroke="#475569" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="374" width="470" height="56" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.4"/>
+<text x="32" y="397" font-size="13.5" font-weight="bold" fill="#1e293b">ans = (t2 + 0xb86) ^ s0</text>
+<text x="32" y="417" font-size="12" fill="#475569">唯一输出，十进制打印</text>
+<rect x="512" y="56" width="250" height="40" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-dasharray="3 3"/>
+<text x="522" y="73" font-size="11.5" fill="#334155">%rdx / %ecx 残留</text>
+<text x="522" y="89" font-size="11.5" fill="#475569">step2 未写 %rdx → 充当参数</text>
+<rect x="512" y="138" width="250" height="40" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-dasharray="3 3"/>
+<text x="522" y="155" font-size="11.5" fill="#334155">5·x 由 lea 实现</text>
+<text x="522" y="171" font-size="11.5" fill="#475569">不是乘法指令，仍按 32 位回绕</text>
+</svg>
