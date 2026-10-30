@@ -531,5 +531,9 @@ QWQ 我是猫，Lab 好硬核，助教老师好牛逼。
 - 课程提供的 `teaching/` 目录（`01_abi.c` 到 `07_stack_copy.c`）与 `tutor` 参考实现，用于对照各关考察点（参数传递、数组、跳转表、递归、结构体、函数指针）。
 - 工具：`objdump -d/-s`（反汇编与 `.rodata` 转储，用于取格式串、跳转表、入口表和节点数据）、`readelf -S` 与 `strings`（定位段偏移与字符串地址）、`python3`（复算公式并与 `bomb` 交叉验证）。
 - `gdb`：在 `secret_gate` / `secret_phase` 下断点核对实参。seed `20261030` 时读到 `challenge = 0xcc440eb2e0d04444`、`context = 0x8de01a2a8d436316`；用 `x/44cb $rdi` 直接看到 secret 行偏移 0~31 是 32 个空格、偏移 32 处正是 `OPEN`，与 9.2 的布局分析和 `_Static_assert` 一致；另用 `x/8gx 0x405b60`、`x/8gx 0x405820` 复核 Phase 5 入口表和 Phase 3 跳转表指针，与 `objdump` 的静态读数逐项相同。其余寄存器与内存内容仍以 `objdump` 静态推算为主，结论最终由 `bomb` 的黑盒反馈验证（公式错会直接 `BOOM`）。
+- `bomb` 未带 `-g` 调试信息，`gdb` 启动时会提示 `No debugging symbols found`，断点是靠 ELF 符号表中的函数名定位的（`secret_gate`、`secret_phase`、`p5_heads` 等都能解析），这不影响寄存器与内存核查。
 - 使用 AI 助手辅助阅读汇编、核对运算宽度与整理本报告结构；所有公式均在本地用 `bomb` 对非公开 seed 实际验证通过后才写入 `defuser.c`。
 
+![gdb 断点与内存核查（seed 20261030）](images/gdb.png)
+
+图 12-1：`break secret_gate` / `break secret_phase` 读到的 `challenge` 与 `context`；`x/44cb $rdi` 显示偏移 0~31 为 32 个空格、偏移 32 起为 `OPEN`；末尾两行为 `p5_heads` 入口表与 Phase 3 跳转表指针，与 `objdump` 静态读数一致。
