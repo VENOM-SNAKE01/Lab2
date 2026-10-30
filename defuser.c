@@ -191,8 +191,10 @@ int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
     uint32_t second = secret_mix(folded) ^ (phase * UINT32_C(0x5a1f)) ^ quiet;
     uint32_t third = second ^ (((lo ^ hi) >> 7) + (tlo ^ thi) + phase + UINT32_C(0xa916));
 
-    /* 前 32 字节随便填（这里用空格），第 32..35 字节是 "OPEN"，数字从第 36 字节开始 */
+    /* 前 32 字节任意（这里用空格），第 32..35 字节必须是 "OPEN"，数字从第 36 字节起 */
     static const char prefix[] = "                                OPEN";
+    /* 这个长度是 secret_gate 的硬性布局，改错了在编译期就报错 */
+    _Static_assert(sizeof(prefix) == 37, "prefix must be 32 bytes + \"OPEN\"");
 
     int size = snprintf(out, cap, "%s %" PRIu32 " %" PRIu32 " %" PRIu32,
                         prefix, first, second, third);
