@@ -1,6 +1,6 @@
 # Lab2 BombLab 实验报告
 
-姓名 / 学号：（可填，也可留空）
+姓名 / 学号：（QWQ我就不填了）
 
 ## 一、实验环境与方法
 
@@ -110,7 +110,7 @@ v[i] = 3 * (v[i-1] + i) - ((challenge >> (27 + 5*(i-1))) & 0x1f)     i = 1..5
 ### 推理过程
 
 - `valid_u32_fields` 的第二个实参是 `0x6`，所以本关口令是 6 个整数；`-0x40(%rbp)` 到 `-0x2c(%rbp)` 地址连续、步长 4，正好 24 字节，判定为 `int v[6]`。
-- 六个实参的传递方式也印证了"数组"：`v[0]~v[3]` 走 `rdx/rcx/r8/r9`（System V 的第 3~6 个整型参数），`v[4]`、`v[5]` 用 `push` 压栈，地址依次连续，说明编译器把 6 个 `&v[i]` 排成一个数组传下去。
+- 六个实参的传递方式也印证了"数组"：`v[0]~v[3]` 走 `rdx/rcx/r8/r9`（System V 的第 3\~6 个整型参数），`v[4]`、`v[5]` 用 `push` 压栈，地址依次连续，说明编译器把 6 个 `&v[i]` 排成一个数组传下去。
 - 循环体三条关键指令：`add %edx,%eax` 先算 `v[i-1] + i`，`lea (%rax,%rax,2),%eax` 等价于 `×3`，`sub %edi,%eax` 再减掉取出的 5 位。`shr %cl` 的 `cl` 从 `0x1b = 27` 起每轮 `+5`，所以 i = 1..5 依次对应移位量 27、32、37、42、47。
 - 首项不走这个循环：`shr $0x27`（39）+ `movzbl`（取 8 位）+ `lea ×3`，即 `v[0] = 3 * ((ch >> 39) & 0xff)`。这里最容易算错的是把循环里的 27 当成首项移位量——首项是"右移 39 取 8 位"，和循环里的"右移 27 起、取低 5 位"是两套参数。
 - 每项都 `and $0x1f`，值域 0..31，配合 `×3` 与减法不会溢出 32 位，因此可以直接用 `uint32_t` 递推。
@@ -159,16 +159,16 @@ p3_dispatch:
 
 令 `sel = challenge & 7`、`x = (uint32_t)((challenge >> 32) ^ (challenge >> 3))`：
 
-| sel | 实际分支 | 计算式 |
-|---|---|---|
-| 0 | case_4 | `(x ^ 0x602f) + (x >> 2)` |
-| 1 | case_1 | `(2x) ^ 0xc1f4` |
-| 2 | case_5 | `(4x) ^ 0xdb50` |
-| 3 | case_6 | `5x + 0x12e4e` |
-| 4 | case_3 | `3x + 0x5eb3` |
-| 5 | case_7 | `3x + 0x7775` |
-| 6 | case_0 | `(x ^ 0x9a14) + (x >> 1)` |
-| 7 | case_2 | `5x + 0x544c` |
+| sel | 实际分支    | 计算式                       |
+| --- | ------- | ------------------------- |
+| 0   | case\_4 | `(x ^ 0x602f) + (x >> 2)` |
+| 1   | case\_1 | `(2x) ^ 0xc1f4`           |
+| 2   | case\_5 | `(4x) ^ 0xdb50`           |
+| 3   | case\_6 | `5x + 0x12e4e`            |
+| 4   | case\_3 | `3x + 0x5eb3`             |
+| 5   | case\_7 | `3x + 0x7775`             |
+| 6   | case\_0 | `(x ^ 0x9a14) + (x >> 1)` |
+| 7   | case\_2 | `5x + 0x544c`             |
 
 口令为 `sel` 和该计算式的值。
 
@@ -307,14 +307,14 @@ p6_dispatch:
 
 对应的小函数：
 
-| 函数 | 计算式 |
-|---|---|
-| p6_op_0 | `(x + 0x2d2e) ^ (x >> 1)` |
-| p6_op_1 | `(8x + 0xc9c2) ^ 7x` |
-| p6_op_2 | `rol(x, 1) ^ 0x39b5` |
-| p6_op_3 | `ror(x, 7)` |
-| p6_op_4 | `(x ^ 0x8adb) + 4x` |
-| p6_op_5 | `((x >> 1) ^ x) + 0x1346` |
+| 函数        | 计算式                       |
+| --------- | ------------------------- |
+| p6\_op\_0 | `(x + 0x2d2e) ^ (x >> 1)` |
+| p6\_op\_1 | `(8x + 0xc9c2) ^ 7x`      |
+| p6\_op\_2 | `rol(x, 1) ^ 0x39b5`      |
+| p6\_op\_3 | `ror(x, 7)`               |
+| p6\_op\_4 | `(x ^ 0x8adb) + 4x`       |
+| p6\_op\_5 | `((x >> 1) ^ x) + 0x1346` |
 
 ### 恢复出的计算关系
 
@@ -361,7 +361,7 @@ Secret phase defused.
 
 ![全量公开测试（60/60，含 Secret 10/10）](images/public-tests.png)
 
-各关各自的运行截图放在第二~七节末尾（`images/phase1.png` ~ `images/phase6.png`）；Honor 与非公开 seed 的截图见 9.5。
+各关各自的运行截图放在第二\~七节末尾（`images/phase1.png` \~ `images/phase6.png`）；Honor 与非公开 seed 的截图见 9.5。
 
 ## 九、Honor（secret）部分
 
@@ -384,7 +384,7 @@ Secret phase defused.
 
 由此确定：`solve_secret(challenge, context, ...)` 的 `context` 就是驱动里 `transcript_context(前六行)` 的值（每行按十进制数字切分、逐个 `context_mix` 折叠），`challenge` 是 phase 7 的 challenge。两者都要参与运算，任何一个都不能当常量。
 
-### 9.2 secret_gate：格式门槛（关键汇编）
+### 9.2 secret\_gate：格式门槛（关键汇编）
 
 ```
 40272b: lea    r12,[rbp-0xd0]           ; 缓冲区起点
@@ -399,9 +399,9 @@ Secret phase defused.
 402794: call   secret_phase              ; 参数是 缓冲区 + 0x24
 ```
 
-`0x4e45504f` 按小端就是 `"OPEN"`，但比较的地址是 `[rbp-0xb0]`、缓冲区基址是 `[rbp-0xd0]`，两者相差 `0x20`，也就是说 **`"OPEN"` 必须在整行的第 32~35 字节**，不是行首；`secret_phase` 的字符串参数又是 `[rbp-0xac]`，即第 36 字节。我第一次按"行首 OPEN"拼行，`bomb` 走到 `Congratulations!` 之后仍然 BOOM；把 `"OPEN"` 挪到偏移 32 后立刻通过。这是本题最容易踩的坑——三个偏移 0x20 / 0x24 / 0xd0 必须一起看。
+`0x4e45504f` 按小端就是 `"OPEN"`，但比较的地址是 `[rbp-0xb0]`、缓冲区基址是 `[rbp-0xd0]`，两者相差 `0x20`，也就是说 **`"OPEN"`** **必须在整行的第 32\~35 字节**，不是行首；`secret_phase` 的字符串参数又是 `[rbp-0xac]`，即第 36 字节。我第一次按"行首 OPEN"拼行，`bomb` 走到 `Congratulations!` 之后仍然 BOOM；把 `"OPEN"` 挪到偏移 32 后立刻通过。这是本题最容易踩的坑——三个偏移 0x20 / 0x24 / 0xd0 必须一起看。
 
-### 9.3 secret_phase：三个 u32 的关系（关键汇编）
+### 9.3 secret\_phase：三个 u32 的关系（关键汇编）
 
 ```
 40264f: call valid_u32_fields(str,3)    ; 恰好 3 个十进制 u32（超出 32 位或有多余字符都拒绝）
@@ -447,19 +447,19 @@ c = b ^ ( (A >> 7) + B + (context & 3) + 0xa916 )
 
 ### 9.5 验证记录（非公开 seed 之外）
 
-| seed | 结果 |
-| --- | --- |
-| 777 | `Secret phase defused.` |
-| 123456789 | `Secret phase defused.` |
-| 20261030 | `Secret phase defused.` |
-| 4294967296 | `Secret phase defused.` |
+| seed        | 结果                      |
+| ----------- | ----------------------- |
+| 777         | `Secret phase defused.` |
+| 123456789   | `Secret phase defused.` |
+| 20261030    | `Secret phase defused.` |
+| 4294967296  | `Secret phase defused.` |
 | 31415926535 | `Secret phase defused.` |
 
 其中 `4294967296`（即 $2^{32}$）专门用来验证高低 32 位拆分：低 32 位为 0、高 32 位为 1，如果公式把 `challenge`/`context` 的整体当成 32 位就会在这里露馅。
 
 `python3 public_test.py --secret` 的结果为 `Secret public tests: 10/10`；全量 `python3 public_test.py` 为 `Public tests: 60/60`、`Secret public tests: 10/10`。
 
-![Honor：`python3 public_test.py --secret`](images/secret.png)
+![Honor：python3 public\_test.py --secret](images/secret.png)
 
 非公开 seed `20261030` 的全流程：
 
@@ -479,10 +479,10 @@ c = b ^ ( (A >> 7) + B + (context & 3) + 0xa916 )
 
 公开列表只有 10 个 seed，为了确认公式对任意 `(challenge, context)` 都成立（而不是记下了某几次的答案），又用 `random.getrandbits(64)` 现场生成 20 个 64 位 seed，直接调用 `public_test.py` 里的 `check_seed`（流程：`defuser --seed S` 出六行 → 喂 `bomb` 校验 → `defuser --secret --seed S` → 六行加 secret 行再喂 `bomb` → 要求输出里出现 `Secret phase defused.`）。结果 **20/20 PASS**，其中几条：
 
-| seed | 结果 |
-| --- | --- |
-| 4053719590916208210 | PASS |
-| 7596897423412270899 | PASS |
+| seed                 | 结果   |
+| -------------------- | ---- |
+| 4053719590916208210  | PASS |
+| 7596897423412270899  | PASS |
 | 13537106793910617173 | PASS |
 | 12142126885077550053 | PASS |
 | 17068187748191050918 | PASS |
@@ -530,5 +530,6 @@ QWQ 我是猫，Lab 好硬核，助教老师好牛逼。
 - 题目与规则来源：课程主页 <https://ics-26fall-fdu.github.io/>，以及仓库 `README.md`（提交物、Secret 说明、报告要求与评分规则）。
 - 课程提供的 `teaching/` 目录（`01_abi.c` 到 `07_stack_copy.c`）与 `tutor` 参考实现，用于对照各关考察点（参数传递、数组、跳转表、递归、结构体、函数指针）。
 - 工具：`objdump -d/-s`（反汇编与 `.rodata` 转储，用于取格式串、跳转表、入口表和节点数据）、`readelf -S` 与 `strings`（定位段偏移与字符串地址）、`python3`（复算公式并与 `bomb` 交叉验证）。
-- 本机 WSL 未安装 `gdb`，寄存器与内存内容全部通过 `objdump` 静态推算，再用 `bomb` 的反馈做黑盒验证（公式错会直接 `BOOM`），因此报告中没有单步调试记录。
+- `gdb`：在 `secret_gate` / `secret_phase` 下断点核对实参。seed `20261030` 时读到 `challenge = 0xcc440eb2e0d04444`、`context = 0x8de01a2a8d436316`；用 `x/44cb $rdi` 直接看到 secret 行偏移 0~31 是 32 个空格、偏移 32 处正是 `OPEN`，与 9.2 的布局分析和 `_Static_assert` 一致；另用 `x/8gx 0x405b60`、`x/8gx 0x405820` 复核 Phase 5 入口表和 Phase 3 跳转表指针，与 `objdump` 的静态读数逐项相同。其余寄存器与内存内容仍以 `objdump` 静态推算为主，结论最终由 `bomb` 的黑盒反馈验证（公式错会直接 `BOOM`）。
 - 使用 AI 助手辅助阅读汇编、核对运算宽度与整理本报告结构；所有公式均在本地用 `bomb` 对非公开 seed 实际验证通过后才写入 `defuser.c`。
+
