@@ -433,6 +433,20 @@ c = b ^ ( (A >> 7) + B + (context & 3) + 0xa916 )
 
 `python3 public_test.py --secret` 的结果为 `Secret public tests: 10/10`；全量 `python3 public_test.py` 为 `Public tests: 60/60`、`Secret public tests: 10/10`。
 
+### 9.6 随机 seed 抽查
+
+公开列表只有 10 个 seed，为了确认公式对任意 `(challenge, context)` 都成立（而不是记下了某几次的答案），又用 `random.getrandbits(64)` 现场生成 20 个 64 位 seed，直接调用 `public_test.py` 里的 `check_seed`（流程：`defuser --seed S` 出六行 → 喂 `bomb` 校验 → `defuser --secret --seed S` → 六行加 secret 行再喂 `bomb` → 要求输出里出现 `Secret phase defused.`）。结果 **20/20 PASS**，其中几条：
+
+| seed | 结果 |
+| --- | --- |
+| 4053719590916208210 | PASS |
+| 7596897423412270899 | PASS |
+| 13537106793910617173 | PASS |
+| 12142126885077550053 | PASS |
+| 17068187748191050918 | PASS |
+
+因为 `context` 是由喂给 `bomb` 的那六行文本折叠出来的，这 20 次 PASS 同时说明六关的答句与 secret 行是一条完整、彼此自洽的链路，任何一环写死都会在这里断掉。
+
 ## 十、参考与工具
 
 - 课程提供的 `teaching/` 目录（`01_abi.c` 到 `07_stack_copy.c`）与 `tutor` 参考实现，用于对照各关卡考察点。
